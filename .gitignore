@@ -77,6 +77,11 @@ target/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+*.ipynb
+**/datasets/*
+**/__pycache__/*
+**/Imaging Science/*
+*:Zone.Identifier
 
 # IPython
 profile_default/
