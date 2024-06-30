@@ -10,11 +10,11 @@ from sklearn.metrics import confusion_matrix
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 emotion_mapping = {1: 'neutral', 2: 'calm', 3: 'happy', 4: 'sad', 5: 'angry', 6: 'fear', 7: 'disgust', 8: 'surprise'}
 
-def validate(model, dl):
+def validate(model, dl, criterion):
     global device
 
     model.eval()
-    loss = nn.CrossEntropyLoss()
+    # loss = nn.CrossEntropyLoss()
     acc_metric = tm.Accuracy(task="multiclass", num_classes=8, average='micro').to(device)
     loss_hist = []
     for x, y in dl:
@@ -22,7 +22,7 @@ def validate(model, dl):
             x, y = x.to(device), y.to(device)
             y_pred = model(x)
 
-            loss_hist.append(loss(y_pred, y).item())
+            loss_hist.append(criterion(y_pred, y).item())
             acc_metric.update(torch.argmax(y_pred, dim=1), y)
     model.train()
     return np.mean(loss_hist), acc_metric.compute().cpu().item()
@@ -63,11 +63,11 @@ def train(model, train_dl, val_dl, epochs, optimizer, scheduler, criterion):
             pbar.set_description(f'Epoch {epoch+1}/{epochs}, Loss: {loss.item():.4f}, Accuracy: {local_train_acc_hist[-1]:.4f}, val_acc (previous): {last_val_acc:.4f} | best_val_acc: {max(val_acc_hist) if len(val_acc_hist) > 0 else -1:.4f} at epoch {np.argmax(val_acc_hist)+1 if len(val_acc_hist) > 0 else -1}')
             pbar.update(1)
 
-        # scheduler.step()
+        scheduler.step()
         train_acc_hist.append(np.mean(local_train_acc_hist))
         train_loss_hist.append(np.mean(local_train_loss_hist))
 
-        last_val_loss, last_val_acc = validate(model, val_dl)
+        last_val_loss, last_val_acc = validate(model, val_dl, criterion)
         val_acc_hist.append(last_val_acc)
         val_loss_hist.append(last_val_loss)
 
