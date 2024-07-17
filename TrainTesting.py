@@ -40,7 +40,8 @@ def train(model, train_dl, val_dl, epochs, optimizer, scheduler, criterion):
 
     val_loss_hist = []
     train_loss_hist = []
-    
+    best_model_state_dict = None
+
     for epoch in range(epochs):
         local_train_acc_hist = []
         local_train_loss_hist = []
@@ -68,71 +69,16 @@ def train(model, train_dl, val_dl, epochs, optimizer, scheduler, criterion):
         train_loss_hist.append(np.mean(local_train_loss_hist))
 
         last_val_loss, last_val_acc = validate(model, val_dl, criterion)
+        
+        if len(val_acc_hist) == 0 or last_val_acc > max(val_acc_hist):
+            best_model_state_dict = model.state_dict()
+
         val_acc_hist.append(last_val_acc)
         val_loss_hist.append(last_val_loss)
 
-    return train_loss_hist, val_loss_hist, train_acc_hist, val_acc_hist
 
-# def train(model, train_dl, val_dl, epochs, optimizer, scheduler, criterion):
-#     global device
 
-#     pbar = tqdm(total=epochs*len(train_dl))
-#     model.train()
-#     train_acc = tm.Accuracy(task='multiclass', average='micro', num_classes=8).to(device)
-    
-#     val_acc_hist = []
-#     train_acc_hist = []
-#     val_loss_hist = []
-#     train_loss_hist = []
-    
-#     best_val_acc = -1
-    
-#     for epoch in range(epochs):
-#         model.train()
-#         train_acc.reset()
-#         local_train_acc_hist = []
-#         local_train_loss_hist = []
-        
-#         for x, y in train_dl:
-#             x = x.to(device)
-#             y = y.to(device)
-
-#             optimizer.zero_grad()
-#             out = model(x)
-#             loss = criterion(out, y)
-#             loss.backward()
-            
-#             # Gradient clipping
-#             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-            
-#             optimizer.step()
-
-#             pred = torch.argmax(out, dim=1)
-#             train_acc.update(pred, y)
-            
-#             local_train_acc_hist.append(train_acc.compute().cpu().item())
-#             local_train_loss_hist.append(loss.item())
-
-#             pbar.set_description(f'Epoch {epoch+1}/{epochs}, Loss: {loss.item():.4f}, Accuracy: {local_train_acc_hist[-1]:.4f}, Best val_acc: {best_val_acc:.4f}')
-#             pbar.update(1)
-
-#         # Validate more frequently, e.g., every 5 epochs
-#             val_loss, val_acc = validate(model, val_dl)
-#             val_acc_hist.append(val_acc)
-#             val_loss_hist.append(val_loss)
-            
-#             if val_acc > best_val_acc:
-#                 best_val_acc = val_acc
-#                 # Save best model
-#                 torch.save(model.state_dict(), 'best_model.pth')
-        
-#         train_acc_hist.append(np.mean(local_train_acc_hist))
-#         train_loss_hist.append(np.mean(local_train_loss_hist))
-        
-#         # Step the scheduler once per epoch
-#         scheduler.step()
-
-#     return train_loss_hist, val_loss_hist, train_acc_hist, val_acc_hist
+    return train_loss_hist, val_loss_hist, train_acc_hist, val_acc_hist, best_model_state_dict
 
 def evaluate_model(net, test_loader):
     global emotion_mapping
