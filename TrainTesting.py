@@ -76,8 +76,6 @@ def train(model, train_dl, val_dl, epochs, optimizer, scheduler, criterion):
         val_acc_hist.append(last_val_acc)
         val_loss_hist.append(last_val_loss)
 
-
-
     return train_loss_hist, val_loss_hist, train_acc_hist, val_acc_hist, best_model_state_dict
 
 def evaluate_model(net, test_loader):
@@ -95,9 +93,7 @@ def evaluate_model(net, test_loader):
     macro_precision = tm.Precision(task='multiclass', average='macro', num_classes=251).to(device)
     micro_recall = tm.Recall(task='multiclass', average='micro', num_classes=251).to(device)
     macro_recall = tm.Recall(task='multiclass', average='macro', num_classes=251).to(device)
-    correct = 0
 
-    # pred, gt = [], []
     with torch.no_grad():
         for el, labels in test_loader:
             el = el.to(device)
@@ -113,24 +109,17 @@ def evaluate_model(net, test_loader):
             macro_precision.update(predicted, labels)
             micro_recall.update(predicted, labels)
             macro_recall.update(predicted, labels)
-            correct += (predicted == labels).sum().item()
-            
+                        
             gt.extend(labels.cpu().numpy())
             pred.extend(predicted.cpu().numpy())
             
-    correct = correct/len(test_loader.dataset)
     print(f"""
           Micro Accuracy: {micro_acc.compute().item()}\tMacro Accuracy:\t{macro_acc.compute().item()}
           Micro F1 Score: {micro_f1_score.compute().item()}\tMacro F1 Score:\t{macro_f1_score.compute().item()}
           Micro Precision:{micro_precision.compute().item()}\tMacro Precision:{macro_precision.compute().item()}
           Micro Recall:   {micro_recall.compute().item()}\tMacro Recall:\t{macro_recall.compute().item()}
-
-          Old accuracy: {correct}
           """)
     
-    cm = confusion_matrix(gt, pred)
-    plt.figure(figsize=(15, 20))
-    sns.heatmap(cm, annot=False, fmt='g', cmap='viridis', xticklabels=list(emotion_mapping.values()), yticklabels=list(emotion_mapping.values()))
-    plt.xlabel('Predicted')
-    plt.ylabel('Actual')
-    plt.savefig('confusion_matrix.png')
+    
+
+
