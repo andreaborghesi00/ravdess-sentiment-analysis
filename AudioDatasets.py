@@ -4,8 +4,15 @@ import numpy as np
 import librosa
 from tqdm import tqdm
 import os
-
-precomputed_dir = 'precomputed_datasets'
+from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import train_test_split
+precomputed_dir = 'numpis'
+dataset_dir = 'datasets'
+RAVDESS_SUBDIR = 'ravdess'
+CREMA_SUBDIR = 'crema/AudioWAV'
+SAVEE_SUBDIR = 'savee/ALL'
+TESS_SUBDIR = 'tess/TESS Toronto emotional speech set data'
+datasets_names = ['ravdess', 'crema', 'savee', 'tess', 'combined']
 
 class AudioDataset(Dataset):
     def __init__(self, X, y):
@@ -16,72 +23,142 @@ class AudioDataset(Dataset):
 
     def __getitem__(self, idx):
         return self.X[idx], self.y[idx]
+
+def get_dataloader(X, y, *args, **kwargs):
+    dataset = AudioDataset(X, y)
+    return DataLoader(dataset, *args, **kwargs)
+
+
+## Extract path and emotion from the dataset directories
+
+def _get_ravdess():
+    global dataset_dir, RAVDESS_SUBDIR
+    ravdess_dir = os.path.join(dataset_dir, RAVDESS_SUBDIR)
     
+    audio_emotion = []
+    audio_path = []
+    for subdir in os.listdir(ravdess_dir):
+        actor = os.listdir(os.path.join(ravdess_dir, subdir))
+            
+        if not str.startswith(subdir, 'Actor_'):
+            print('Skipping non-actor directory')
+            continue
 
-class AugmentedAudioDataset(Dataset):
-    def __init__(self, X, y, augmentation_prob=0.5, transforms=None):
-        self.X = X
-        self.y = y
-        self.y = torch.tensor(self.y, dtype=torch.long)
-        self.augmentation_prob = augmentation_prob
-        self.transforms = transforms
-    def __len__(self):
-        return len(self.X)
+        for f in actor:
+            part = f.split('.')[0].split('-')
+            audio_emotion.append(int(part[2])) # the emotion is at the third position of the filename
+            audio_path.append(os.path.join(ravdess_dir, subdir, f))
+    return audio_emotion,audio_path
 
-
-    def __getitem__(self, idx):
-        feats = get_features(self.X[idx], augmentation_prob=self.augmentation_prob, transform=self.transforms)
-        # check shape, if not correct, add padding
-        # if feats.shape[0] != 108:
-        #     feats = np.hstack((feats, np.zeros((feats.shape[0], 108-feats.shape[1]))))
-
-        feats = torch.tensor(feats, dtype=torch.float32)
-        feats = feats.unsqueeze(0)
-        return feats, self.y[idx]
-
-
-class PreAugmentedDataset(Dataset):
-    def __init__(self, X, y, augmentation_prob=0.8, dataset_multiplier=4, transforms=None):
-        self.X = X
-        self.y = y
-        self.y = torch.tensor(self.y, dtype=torch.long)
-        self.augmentation_prob = augmentation_prob
-        self.transforms = transforms
-
-        self.X_features = []
-
-        for _ in range(dataset_multiplier):
-            for idx in tqdm(range(len(self.X))):
-                feats = get_features(self.X[idx], augmentation_prob=self.augmentation_prob, transform=self.transforms)
-                self.X_features.append(feats)
-        self.X_features = torch.tensor(self.X_features, dtype=torch.float32)
-        self.X_features = self.X_features.unsqueeze(1)
-        self.y = self.y.repeat(dataset_multiplier, 1)
-    def __len__(self):
-        return len(self.X)
-
-    def __getitem__(self, idx):
-        return self.X_features[idx], self.y[idx]
+def _get_crema():
+    global dataset_dir, CREMA_SUBDIR
+    crema_dir = os.path.join(dataset_dir, CREMA_SUBDIR)
     
+    audio_emotion = []
+    audio_path = []
+    for file in os.listdir(crema_dir):
+        audio_path.append(os.path.join(crema_dir, file))
+
+        part=file.split('_')
+        if part[2] == 'SAD':
+            audio_emotion.append('sad')
+        elif part[2] == 'ANG':
+            audio_emotion.append('angry')
+        elif part[2] == 'DIS':
+            audio_emotion.append('disgust')
+        elif part[2] == 'FEA':
+            audio_emotion.append('fear')
+        elif part[2] == 'HAP':
+            audio_emotion.append('happy')
+        elif part[2] == 'NEU':
+            audio_emotion.append('neutral')
+        else:
+            print('whats this: ', audio_path[-1])
+            audio_path.pop()
+    return audio_emotion, audio_path
+
+def _get_savee():
+    global dataset_dir, SAVEE_SUBDIR
+    savee_dir = os.path.join(dataset_dir, SAVEE_SUBDIR)
+    
+    audio_emotion = []
+    audio_path = []
+    for file in os.listdir(savee_dir):
+        audio_path.append(os.path.join(savee_dir, file))
+        part = file.split('_')[1]
+        ele = part[:-6]
+        if ele=='a':
+            audio_emotion.append('angry')
+        elif ele=='d':
+            audio_emotion.append('disgust')
+        elif ele=='f':
+            audio_emotion.append('fear')
+        elif ele=='h':
+            audio_emotion.append('happy')
+        elif ele=='n':
+            audio_emotion.append('neutral')
+        elif ele=='sa':
+            audio_emotion.append('sad')
+        else:
+            audio_emotion.append('surprise')
+            
+    return audio_emotion, audio_path
+
+def _get_tess():
+    global dataset_dir, TESS_SUBDIR
+    tess_dir = os.path.join(dataset_dir, TESS_SUBDIR)
+    
+    audio_emotion = []
+    audio_path = []
+    for dir in os.listdir(tess_dir):
+        directories = os.listdir(os.path.join(tess_dir, dir))
+        for file in directories:
+            audio_path.append(os.path.join(tess_dir, dir, file))
+            
+            part = file.split('.')[0]
+            part = part.split('_')[2]
+            if part=='ps':
+                audio_emotion.append('surprise')
+            else:
+                audio_emotion.append(part) # the rest have a proper name
+    return audio_emotion, audio_path
+
+def _get_joined_datasets(dataset_names=['crema', 'savee', 'tess']):
+    audio_emotion = []
+    audio_path = []
+    for dataset_name in dataset_names:
+        if dataset_name not in datasets_names: raise ValueError(f'Dataset name must be one of {datasets_names}')
+        
+        datasets_extractors = {
+            'crema': _get_crema,
+            'savee': _get_savee,
+            'tess': _get_tess
+        }
+        
+        audio_emotion_temp, audio_path_temp = datasets_extractors[dataset_name]()
+        audio_emotion.extend(audio_emotion_temp)
+        audio_path.extend(audio_path_temp)
+    return audio_emotion, audio_path
+
+## Data Augmentation
 
 def noise(data, sr):
     noise_amp = 0.035*np.random.uniform()*np.amax(data)
     data = data + noise_amp*np.random.normal(size=data.shape[0])
     return data
 
-
 def stretch(data, sr, rate=0.8):
     return librosa.effects.time_stretch(y=data, rate=rate)
-
 
 def shift(data, sr):
     shift_range = int(np.random.uniform(low=-5, high = 5)*1000)
     return np.roll(data, shift_range)
 
-
 def pitch(data, sampling_rate, pitch_factor=0.7):
     return librosa.effects.pitch_shift(y=data, sr=sampling_rate, n_steps=pitch_factor)
 
+
+## Feature extraction
 
 def extract_features(data, sample_rate):
     result = np.array([])
@@ -103,7 +180,7 @@ def extract_features(data, sample_rate):
 
     return result
 
-def get_features(path, transforms=None):
+def get_features(path, augment=False):
     # duration and offset are used to take care of the no audio in start and the ending of each audio files as seen above.
     data, sample_rate = librosa.load(path, duration=2.5, offset=0.6)
     
@@ -111,19 +188,107 @@ def get_features(path, transforms=None):
     res1 = extract_features(data, sample_rate)
     result = np.array(res1)
     
-    if transforms is not None:
+    if augment:
         # data with noise
-        noise_data = noise(data, sample_rate)
+        temp_data = shift(data, sample_rate)
+        noise_data = noise(temp_data, sample_rate)
         res2 = extract_features(noise_data, sample_rate)
         result = np.vstack((result, res2)) # stacking vertically
         
         # data with stretching and pitching
-        new_data = stretch(data, sample_rate)
-        data_stretch_pitch = pitch(new_data, sample_rate)
+        temp_data = stretch(data, sample_rate)
+        data_stretch_pitch = pitch(temp_data, sample_rate)
         res3 = extract_features(data_stretch_pitch, sample_rate)
-        result = np.vstack((result, res3)) # stacking vertically
+        result = np.vstack((result, res3)) 
+
+        temp_data = shift(data, sample_rate)
+        data_shift_pitch = pitch(temp_data, sample_rate)
+        res4 = extract_features(data_shift_pitch, sample_rate)
+        result = np.vstack((result, res4))
+
+        temp_data = stretch(data, sample_rate)
+        data_stretch_noise = noise(temp_data, sample_rate)
+        res5 = extract_features(data_stretch_noise, sample_rate)
+        result = np.vstack((result, res5))
     
     return result
+
+def _extract(path, labels, augment=False):
+    X_features = []
+    Y = []
+    pbar = tqdm(total=len(path))
+    for idx in range(len(path)):
+        feats = get_features(path[idx], augment=augment)
+        if augment:
+            for f in feats:
+                X_features.append(f)
+                Y.append(labels[idx])
+        else:
+            X_features.append(feats)
+            Y.append(labels[idx])
+        pbar.update()
+
+    X_features = np.array(X_features)
+    Y = np.array(Y)
+    pbar.close()
+    return X_features, Y
+
+
+def get_data_splits(dataset_name='ravdess', force_recompute=False, random_state=0, train_split=0.7, augment_train=True):
+    global precomputed_dir, dataset_dir
+
+    if dataset_name not in datasets_names: raise ValueError(f'Dataset name must be one of {datasets_names}')
+
+    precomputed_req_dir = os.path.join(precomputed_dir, dataset_name)
+    os.makedirs(precomputed_req_dir, exist_ok=True)
+    
+    X_train_path = os.path.join(precomputed_req_dir, 'X_train.npy')
+    X_val_path = os.path.join(precomputed_req_dir, 'X_val.npy')
+    X_test_path = os.path.join(precomputed_req_dir, 'X_test.npy')
+    Y_train_path = os.path.join(precomputed_req_dir, 'Y_train.npy')
+    Y_val_path = os.path.join(precomputed_req_dir, 'Y_val.npy')
+    Y_test_path = os.path.join(precomputed_req_dir, 'Y_test.npy')
+    paths_exist = np.any([os.path.exists(X_train_path), os.path.exists(X_val_path), os.path.exists(X_test_path), os.path.exists(Y_train_path), os.path.exists(Y_val_path), os.path.exists(Y_test_path)])
+    
+    if force_recompute or paths_exist == False:
+        datasets_extractors = {
+            'ravdess': _get_ravdess,
+            'crema': _get_crema,
+            'savee': _get_savee,
+            'tess': _get_tess, 
+            'combined': _get_joined_datasets
+        }
+        
+        audio_emotion, audio_path = datasets_extractors[dataset_name]()
+
+        label_encoder = LabelEncoder()
+        y = label_encoder.fit_transform(audio_emotion)
+
+        X_train_paths, X_valtest_paths, y_train, y_valtest = train_test_split(audio_path, y, test_size=1-train_split, random_state=random_state, stratify=y)
+        X_val_paths, X_test_paths, y_val, y_test = train_test_split(X_valtest_paths, y_valtest, test_size=0.5, random_state=random_state, stratify=y_valtest)
+
+        X_train, y_train = _extract(X_train_paths, y_train, augment=augment_train)
+        X_val, y_val = _extract(X_val_paths, y_val, augment=False)
+        X_test, y_test = _extract(X_test_paths, y_test, augment=False)
+
+        np.save(X_train_path, X_train)
+        np.save(X_val_path, X_val)
+        np.save(X_test_path, X_test)
+        np.save(Y_train_path, y_train)
+        np.save(Y_val_path, y_val)
+        np.save(Y_test_path, y_test)
+        
+    else:
+        print('Loading precomputed data splits')
+        X_train = np.load(X_train_path)
+        X_val = np.load(X_val_path)
+        X_test = np.load(X_test_path)
+        y_train = np.load(Y_train_path)
+        y_val = np.load(Y_val_path)
+        y_test = np.load(Y_test_path)
+    return X_train, X_val, X_test, y_train, y_val, y_test
+
+
 
 
         
