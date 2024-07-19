@@ -236,6 +236,19 @@ class CNNModel(Module):
         return x
     
 def get_model(model_class, dict_path):
+    """
+    Load a pre-trained model from the specified path.
+
+    Args:
+        model_class (class): The class of the model to be loaded.
+        dict_path (str): The path to the dictionary containing the model weights.
+
+    Returns:
+        model: The loaded model.
+
+    Raises:
+        Exception: If the model weights are not found.
+    """
     model = model_class()
     try:
         model = torch.load(dict_path)['model']
