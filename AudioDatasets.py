@@ -25,6 +25,19 @@ class AudioDataset(Dataset):
         return self.X[idx], self.y[idx]
 
 def get_dataloader(X, y, *args, **kwargs):
+    """
+    Create and return a DataLoader object for the given dataset.
+
+    Args:
+        X (list): The input data.
+        y (list): The target labels.
+        *args: Additional positional arguments to be passed to the DataLoader constructor.
+        **kwargs: Additional keyword arguments to be passed to the DataLoader constructor.
+
+    Returns:
+        DataLoader: A DataLoader object for the given dataset.
+
+    """
     dataset = AudioDataset(X, y)
     return DataLoader(dataset, *args, **kwargs)
 
@@ -32,6 +45,13 @@ def get_dataloader(X, y, *args, **kwargs):
 ## Extract path and emotion from the dataset directories
 
 def _get_ravdess():
+    """
+    Retrieves the RAVDESS dataset.
+
+    Returns:
+        audio_emotion (list): List of integers representing the emotions of the audio files.
+        audio_path (list): List of strings representing the file paths of the audio files.
+    """
     global dataset_dir, RAVDESS_SUBDIR
     ravdess_dir = os.path.join(dataset_dir, RAVDESS_SUBDIR)
     
@@ -48,9 +68,16 @@ def _get_ravdess():
             part = f.split('.')[0].split('-')
             audio_emotion.append(int(part[2])) # the emotion is at the third position of the filename
             audio_path.append(os.path.join(ravdess_dir, subdir, f))
-    return audio_emotion,audio_path
+    return audio_emotion, audio_path
 
 def _get_crema():
+    """
+    Retrieves the audio emotion labels and paths for the CREMA-D dataset.
+
+    Returns:
+        audio_emotion (list): A list of strings representing the emotion labels for each audio file.
+        audio_path (list): A list of strings representing the file paths for each audio file.
+    """
     global dataset_dir, CREMA_SUBDIR
     crema_dir = os.path.join(dataset_dir, CREMA_SUBDIR)
     
@@ -78,6 +105,13 @@ def _get_crema():
     return audio_emotion, audio_path
 
 def _get_savee():
+    """
+    Retrieves the audio emotions and paths for the SAVEE dataset.
+
+    Returns:
+        audio_emotion (list): A list of strings representing the emotions of the audio files.
+        audio_path (list): A list of strings representing the file paths of the audio files.
+    """
     global dataset_dir, SAVEE_SUBDIR
     savee_dir = os.path.join(dataset_dir, SAVEE_SUBDIR)
     
@@ -105,6 +139,13 @@ def _get_savee():
     return audio_emotion, audio_path
 
 def _get_tess():
+    """
+    Retrieves the audio emotions and paths for the TESS dataset.
+
+    Returns:
+        audio_emotion (list): A list of audio emotions.
+        audio_path (list): A list of audio paths.
+    """
     global dataset_dir, TESS_SUBDIR
     tess_dir = os.path.join(dataset_dir, TESS_SUBDIR)
     
@@ -124,10 +165,26 @@ def _get_tess():
     return audio_emotion, audio_path
 
 def _get_joined_datasets(dataset_names=['crema', 'savee', 'tess']):
+    """
+    Get the joined datasets for the given dataset names.
+
+    Args:
+        dataset_names (list): List of dataset names to be joined. Default is ['crema', 'savee', 'tess'].
+
+    Returns:
+        tuple: A tuple containing two lists - audio_emotion and audio_path.
+            - audio_emotion (list): List of emotion labels for the audio samples.
+            - audio_path (list): List of file paths for the audio samples.
+
+    Raises:
+        ValueError: If the dataset name is not one of ['crema', 'savee', 'tess'].
+
+    """
     audio_emotion = []
     audio_path = []
     for dataset_name in dataset_names:
-        if dataset_name not in datasets_names: raise ValueError(f'Dataset name must be one of {datasets_names}')
+        if dataset_name not in datasets_names:
+            raise ValueError(f'Dataset name must be one of {datasets_names}')
         
         datasets_extractors = {
             'crema': _get_crema,
@@ -143,24 +200,78 @@ def _get_joined_datasets(dataset_names=['crema', 'savee', 'tess']):
 ## Data Augmentation
 
 def noise(data, sr):
+    """
+    Add random noise to the audio data.
+
+    Parameters:
+    - data (ndarray): The audio data.
+    - sr (int): The sample rate of the audio data.
+
+    Returns:
+    - ndarray: The audio data with added noise.
+    """
     noise_amp = 0.035*np.random.uniform()*np.amax(data)
     data = data + noise_amp*np.random.normal(size=data.shape[0])
     return data
 
 def stretch(data, sr, rate=0.8):
+    """
+    Stretch the given audio data by a specified rate.
+
+    Parameters:
+    - data (ndarray): The audio data to be stretched.
+    - sr (int): The sample rate of the audio data.
+    - rate (float, optional): The stretching rate. Default is 0.8.
+
+    Returns:
+    - ndarray: The stretched audio data.
+
+    """
     return librosa.effects.time_stretch(y=data, rate=rate)
 
 def shift(data, sr):
-    shift_range = int(np.random.uniform(low=-5, high = 5)*1000)
+    """
+    Shifts the given audio data by a random amount within the range of -5 to 5 milliseconds.
+
+    Args:
+        data (ndarray): The audio data to be shifted.
+        sr (int): The sample rate of the audio data.
+
+    Returns:
+        ndarray: The shifted audio data.
+    """
+    shift_range = int(np.random.uniform(low=-5, high=5) * 1000)
     return np.roll(data, shift_range)
 
 def pitch(data, sampling_rate, pitch_factor=0.7):
+    """
+    Applies pitch shifting to the given audio data.
+
+    Parameters:
+    - data (ndarray): The audio data to be pitch shifted.
+    - sampling_rate (int): The sampling rate of the audio data.
+    - pitch_factor (float): The amount of pitch shift to apply. Default is 0.7.
+
+    Returns:
+    - ndarray: The pitch-shifted audio data.
+
+    """
     return librosa.effects.pitch_shift(y=data, sr=sampling_rate, n_steps=pitch_factor)
 
 
 ## Feature extraction
 
 def extract_features(data, sample_rate):
+    """
+    Extracts audio features from the given data: zero crossing rate, chroma, mfcc, rms, and mel spectrogram.
+
+    Parameters:
+    - data (ndarray): Audio data.
+    - sample_rate (int): Sample rate of the audio data.
+
+    Returns:
+    - result (ndarray): Extracted audio features.
+    """
     result = np.array([])
     zcr = np.mean(librosa.feature.zero_crossing_rate(y=data).T, axis=0)
     result=np.hstack((result, zcr))
@@ -181,6 +292,20 @@ def extract_features(data, sample_rate):
     return result
 
 def get_features(path, augment=False):
+    """
+    Extracts audio features from the given audio file and eventually augment it.
+    The augmentation is done by adding noise, stretching, and pitching the audio data.
+    The augmentation produces 4 additional data points for each audio file: shift+noise, stretch+pitch, shift+pitch, stretch+noise.
+
+    Args:
+        path (str): The path to the audio file.
+        augment (bool, optional): Whether to augment the data with noise, stretching, and pitching. 
+                                  Defaults to False.
+
+    Returns:
+        numpy.ndarray: An array of extracted audio features.
+
+    """
     # duration and offset are used to take care of the no audio in start and the ending of each audio files as seen above.
     data, sample_rate = librosa.load(path, duration=2.5, offset=0.6)
     
