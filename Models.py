@@ -1,6 +1,7 @@
 import torch
 from torch.nn import Module, Sequential, Conv1d, BatchNorm1d, ReLU, MaxPool1d, Linear, Dropout1d, LSTM, Flatten, Dropout, GELU
 import torch.nn.functional as F
+import TrainTesting
 
 class AudioCNN(Module):
     def __init__(self): # in size: 162
@@ -183,7 +184,6 @@ class AudioLSTM(Module):
         return out
     
 class CNNModel(Module):
-
     def __init__(self, input_shape):
         super(CNNModel, self).__init__()
         
@@ -234,3 +234,12 @@ class CNNModel(Module):
         x = F.relu(self.fc2(x), dim=1)
         
         return x
+    
+def get_model(model_class, dict_path):
+    model = model_class()
+    try:
+        model = torch.load(dict_path)['model']
+    except:
+        raise Exception("Model weights not found. Please train the model first.")
+    return model.to(TrainTesting.device)
+    

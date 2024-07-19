@@ -6,6 +6,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import confusion_matrix
+import AudioDatasets
+import pickle
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 emotion_mapping = {1: 'neutral', 2: 'calm', 3: 'happy', 4: 'sad', 5: 'angry', 6: 'fear', 7: 'disgust', 8: 'surprise'}
@@ -85,14 +87,14 @@ def evaluate_model(net, test_loader):
     gt = []
     pred = []
     
-    micro_acc = tm.Accuracy(task='multiclass', average='micro', num_classes=251).to(device)
-    macro_acc = tm.Accuracy(task='multiclass', average='macro', num_classes=251).to(device)
-    micro_f1_score = tm.F1Score(task='multiclass', average='micro', num_classes=251, multidim_average='global').to(device)
-    macro_f1_score = tm.F1Score(task='multiclass', average='macro', num_classes=251, multidim_average='global').to(device)
-    micro_precision = tm.Precision(task='multiclass', average='micro', num_classes=251).to(device)
-    macro_precision = tm.Precision(task='multiclass', average='macro', num_classes=251).to(device)
-    micro_recall = tm.Recall(task='multiclass', average='micro', num_classes=251).to(device)
-    macro_recall = tm.Recall(task='multiclass', average='macro', num_classes=251).to(device)
+    micro_acc = tm.Accuracy(task='multiclass', average='micro', num_classes=8).to(device)
+    macro_acc = tm.Accuracy(task='multiclass', average='macro', num_classes=8).to(device)
+    micro_f1_score = tm.F1Score(task='multiclass', average='micro', num_classes=8, multidim_average='global').to(device)
+    macro_f1_score = tm.F1Score(task='multiclass', average='macro', num_classes=8, multidim_average='global').to(device)
+    micro_precision = tm.Precision(task='multiclass', average='micro', num_classes=8).to(device)
+    macro_precision = tm.Precision(task='multiclass', average='macro', num_classes=8).to(device)
+    micro_recall = tm.Recall(task='multiclass', average='micro', num_classes=8).to(device)
+    macro_recall = tm.Recall(task='multiclass', average='macro', num_classes=8).to(device)
 
     with torch.no_grad():
         for el, labels in test_loader:
@@ -121,5 +123,28 @@ def evaluate_model(net, test_loader):
           """)
     
     
+def infer(model, data, sr, extract_features=True):
+    global device
+    
+    if extract_features:
+        features = AudioDatasets.extract_features(data, sr)
+    else:
+        features = data
 
+    features = np.expand_dims(features, axis=0)    
+    scaler = pickle.load(open('ravdess_scaler.pkl', 'rb'))
+    features = scaler.transform(features)
 
+    model.eval()
+    model.to(device)
+    with torch.no_grad():
+        features = torch.tensor(features, dtype=torch.float32).to(device)
+        features = features.unsqueeze(0)
+        features = features.float()
+        pred = model(features)
+        pred = torch.argmax(pred, dim=1)
+    
+    emotion_id = pred.item() + 1 # label encoding starts from 0, but our emotion mapping starts from 1
+    emotion = emotion_mapping[emotion_id] 
+    return emotion, emotion_id
+    
