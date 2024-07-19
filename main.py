@@ -11,6 +11,7 @@ from torch.optim.lr_scheduler import CosineAnnealingLR, CosineAnnealingWarmResta
 import numpy as np
 import os
 import gc
+import pickle
 
 from matplotlib import pyplot as plt
 from sklearn.metrics import confusion_matrix
@@ -33,12 +34,15 @@ if __name__ == '__main__':
         experiment_name = f'{dataset_name}_pretrained'
         
         # print('Loading data...')
-        X_train, X_val, X_test, y_train, y_val, y_test = AudioDatasets.get_data_splits(dataset_name=dataset_name, force_recompute=force_recompute, augment_train=True, random_state=0, train_split=0.7)
+        X_train, X_val, X_test, y_train, y_val, y_test = AudioDatasets.get_data_splits(dataset_name='ravdess', force_recompute=force_recompute, augment_train=True, random_state=0, train_split=0.7)
         
         scaler = StandardScaler() # Standardize features
         X_train = scaler.fit_transform(X_train)
         X_val = scaler.transform(X_val)
         X_test = scaler.transform(X_test)
+        
+        # save scaler
+        pickle.dump(scaler, open(f'ravdess_scaler.pkl', 'wb'))
 
         # Add channel dimension, required for CNN
         X_train = np.expand_dims(X_train, axis=1)
@@ -57,7 +61,7 @@ if __name__ == '__main__':
         # print('Creating model...')
         model = Models.AudioCNN()
         model = model.to(TrainTesting.device)
-        # model.load_state_dict(torch.load(os.path.join(pretrain_models_root, f'{model.__class__.__name__}_{dataset_name}.pth')))
+        model.load_state_dict(torch.load(os.path.join(pretrain_models_root, f'{model.__class__.__name__}_{dataset_name}.pth')))
         # model.load_state_dict(torch.load(os.path.join('results/models/AudioCNN', f'model_{dataset_name}_pretrained_0.pth')))
         
         epochs = 80
@@ -70,9 +74,9 @@ if __name__ == '__main__':
         train_loss, val_loss, train_acc, val_acc, best_dict = TrainTesting.train(model, train_dl, val_dl, epochs, optimizer, scheduler, criterion)
         TrainTesting.evaluate_model(model, test_dl)
         torch.save(model.state_dict(), os.path.join(pretrain_models_root, f'{model.__class__.__name__}_{dataset_name}.pth'))      
-        # Utils.save_model(model, experiment_name)
-        # Utils.plots(model, experiment_name, train_loss, val_loss, train_acc, val_acc)
-        # Utils.compute_confusion_matrix(model, test_dl, experiment_name, normalized=True)
+        Utils.save_model(model, experiment_name)
+        Utils.plots(model, experiment_name, train_loss, val_loss, train_acc, val_acc)
+        Utils.compute_confusion_matrix(model, test_dl, experiment_name, normalized=True)
         
         # clear memory
         del X_train, X_val, X_test, y_train, y_val, y_test, train_dl, val_dl, test_dl, model, optimizer, scheduler, criterion

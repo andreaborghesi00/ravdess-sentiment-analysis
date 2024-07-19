@@ -133,4 +133,8 @@ def save_model(model, experiment_name):
     i = 0 # i know it's ugly, leave me alone
     while os.path.exists(os.path.join(model_dir, f'{PREFIX_MODELS}_{experiment_name}_{i}.pth')): i += 1
 
-    torch.save(model.state_dict(), os.path.join(model_dir, f'{PREFIX_MODELS}_{experiment_name}_{i}.pth'))
+    torch.save(
+        {'model': model,
+         'state_dict': model.state_dict()
+         }, 
+        os.path.join(model_dir, f'{PREFIX_MODELS}_{experiment_name}_{i}.pth'))
