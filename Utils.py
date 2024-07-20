@@ -18,6 +18,7 @@ RES_DIR = "results"
 PREFIX_MODELS = "model"
 PREFIX_ROC = "roc"
 PREFIX_PR = "pr"
+PREFIX_NUMPIS = "num"
 
 def _test_probas(model, test_dl):
     """
@@ -81,6 +82,7 @@ def compute_confusion_matrix(model, test_dl, experiment_name, normalized=True):
     plt.xlabel('Predicted', fontsize=18)
     plt.ylabel('Actual', fontsize=18)
     plt.savefig(os.path.join(conf_dir, f'{PREFIX_CM}_{experiment_name}_{i}.png'))
+    sns.set_theme(font_scale=1)
     plt.close('all')
     
 def plots(model, experiment_name, train_loss, val_loss, train_acc, val_acc):
@@ -107,14 +109,16 @@ def plots(model, experiment_name, train_loss, val_loss, train_acc, val_acc):
     plt.subplot(1, 2, 1)
     plt.plot(train_loss, label='train')
     plt.plot(val_loss, label='val')
-    plt.title('Loss')
-    plt.legend()
+    plt.legend(fontsize=14)
+    plt.xlabel("Epochs", fontsize=14)
+    plt.ylabel("Loss", fontsize=14)
 
     plt.subplot(1, 2, 2)
     plt.plot(train_acc, label='train')
     plt.plot(val_acc, label='val')
-    plt.title('Accuracy')
-    plt.legend()
+    plt.legend(fontsize=14)
+    plt.xlabel("Epochs", fontsize=14)
+    plt.ylabel("Accuracy", fontsize=14)    
     plt.savefig(os.path.join(plot_dir, f'{PREFIX_PLOTS}_{experiment_name}_{i}.png'))
     plt.close('all')
     
@@ -138,3 +142,30 @@ def save_model(model, experiment_name):
          'state_dict': model.state_dict()
          }, 
         os.path.join(model_dir, f'{PREFIX_MODELS}_{experiment_name}_{i}.pth'))
+    
+def save_numpis(model, experiment_name, train_loss, val_loss, train_acc, val_acc):
+    """
+    Save the numpy arrays to disk.
+
+    Args:
+        train_loss (list): List of training loss values.
+        val_loss (list): List of validation loss values.
+        train_acc (list): List of training accuracy values.
+        val_acc (list): List of validation accuracy values.
+    """
+    global RES_DIR, PREFIX_NUMPIS
+    numpi_dir = os.path.join(RES_DIR, "numpis", model.__class__.__name__)
+    os.makedirs(numpi_dir, exist_ok=True)
+
+    i = 0 # i know it's ugly, leave me alone
+    while os.path.exists(os.path.join(numpi_dir, f'{PREFIX_NUMPIS}_{experiment_name}_{i}.npy')): i += 1
+
+    numpi_dict = {
+        'train_loss': train_loss,
+        'val_loss': val_loss,
+        'train_acc': train_acc,
+        'val_acc': val_acc
+    
+    }
+
+    np.save(os.path.join(numpi_dir, f'{PREFIX_NUMPIS}_{experiment_name}_{i}.npy'), numpi_dict)
