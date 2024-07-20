@@ -390,7 +390,7 @@ def get_data_splits(dataset_name='ravdess', force_recompute=False, random_state=
         y = label_encoder.fit_transform(audio_emotion)
 
         X_train_paths, X_valtest_paths, y_train, y_valtest = train_test_split(audio_path, y, test_size=1-train_split, random_state=random_state, stratify=y)
-        X_val_paths, X_test_paths, y_val, y_test = train_test_split(X_valtest_paths, y_valtest, test_size=0.5, random_state=random_state, stratify=y_valtest)
+        X_val_paths, X_test_paths, y_val, y_test = train_test_split(X_valtest_paths, y_valtest, test_size=0.6777, random_state=random_state, stratify=y_valtest)
 
         X_train, y_train = _extract(X_train_paths, y_train, augment=augment_train)
         X_val, y_val = _extract(X_val_paths, y_val, augment=False)
