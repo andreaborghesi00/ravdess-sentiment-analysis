@@ -27,6 +27,7 @@ import logging
 emotion_mapping = {1: 'neutral', 2: 'calm', 3: 'happy', 4: 'sad', 5: 'angry', 6: 'fear', 7: 'disgust', 8: 'surprise'}
 pretrain_datasets = [None, 'crema', 'savee', 'combined', 'tess']
 pretrain_models_root = 'pretrained_models'
+scalers_root = 'scalers'
 pretraining = False
 force_recompute = False
 
@@ -47,18 +48,19 @@ if __name__ == '__main__':
         logger.info(f"Loading {training_dataset} dataset...")
         X_train, X_val, X_test, y_train, y_val, y_test = AudioDatasets.get_data_splits(dataset_name=training_dataset, force_recompute=force_recompute, augment_train=True, random_state=0, train_split=0.7)
         
-        if not os.path.exists(f'{training_dataset}_scaler.pkl'):
+        scaler_path = os.path.join(scalers_root, f'{training_dataset}_scaler.pkl')
+        if not os.path.exists(scaler_path):
             logger.info(f"Scaler not found, creating new scaler...")
             scaler = StandardScaler() # Standardize features
         else:
-            scaler = pickle.load(open(f'{training_dataset}_scaler.pkl', 'rb'))
+            scaler = pickle.load(open(scaler_path, 'rb'))
         X_train = scaler.fit_transform(X_train)
         X_val = scaler.transform(X_val)
         X_test = scaler.transform(X_test)
         
         # save scaler
-        if not os.path.exists(f'{training_dataset}_scaler.pkl'):
-            pickle.dump(scaler, open(f'{training_dataset}_scaler.pkl', 'wb'))
+        if not os.path.exists(scaler_path):
+            pickle.dump(scaler, open(scaler_path, 'wb'))
 
         # Add channel dimension
         X_train = np.expand_dims(X_train, axis=1)
