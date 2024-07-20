@@ -5,3 +5,5 @@
 *:Zone.Identifier
 **/dataset/*
 **/numpis/*
+**/datasets_numpis/*
+**/pretrained_models/*
