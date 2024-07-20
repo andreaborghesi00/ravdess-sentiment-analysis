@@ -35,16 +35,17 @@ def main():
         st.audio(uploaded_file)
         audio_data, sr = librosa.load(uploaded_file)
         
-        st.subheader("Waveplot")
-        fig = plt.figure(figsize=(12, 6))
-        librosa.display.waveshow(audio_data, sr=sr)
-        st.pyplot(fig=fig)
         
         if st.button("Predict Sentiment"):
             prediction = TrainTesting.infer(model, audio_data, sr)
             st.subheader("Prediction")
             st.write(prediction)
             st.markdown(f"![Alt Text]({emotion_urls[prediction[1]]})")
+            
+        st.subheader("Waveplot")
+        fig = plt.figure(figsize=(12, 6))
+        librosa.display.waveshow(audio_data, sr=sr)
+        st.pyplot(fig=fig)
 
             
 if __name__ == "__main__":
