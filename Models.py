@@ -2,7 +2,9 @@ import torch
 from torch.nn import Module, Sequential, Conv1d, BatchNorm1d, ReLU, MaxPool1d, Linear, Dropout1d, LSTM, Flatten, Dropout, GELU
 import torch.nn.functional as F
 import TrainTesting
+import logging
 
+logging.basicConfig()
 class AudioCNN(Module):
     def __init__(self): # in size: 162
         super(AudioCNN, self).__init__()
@@ -163,23 +165,21 @@ class SimpleAudioCNN2(Module):
         return x
 
 class AudioLSTM(Module):
-    def __init__(self, input_size, hidden_size=256, num_layers=4):
+    def __init__(self, input_size, hidden_size=256, num_layers=4, num_classes=8, log_level=logging.INFO):
         super(AudioLSTM, self).__init__()
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.hidden_size = hidden_size
         self.num_layers = num_layers
 
-        self.lstm = LSTM(input_size, hidden_size, num_layers, batch_first=True)
-        self.fc = Linear(hidden_size, 8)
-        self.relu = ReLU()
+        self.lstm = LSTM(input_size, hidden_size, num_layers, batch_first=True, bidirectional=True)
+        self.fc = Linear(hidden_size*2, num_classes)
+        
+        self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
+        self.logger.setLevel(log_level)
         
     def forward(self, x):
-        h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(self.device)
-        c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(self.device)
-        
-        out, _ = self.lstm(x, (h0, c0))
+        out, _ = self.lstm(x)
+        self.logger.debug(f"out.shape: {out.shape}")
         out = self.fc(out[:, -1, :])
-        # out = self.relu(out)
 
         return out
     
