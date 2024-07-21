@@ -6,7 +6,7 @@ from tqdm import tqdm
 import os
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
-precomputed_dir = 'numpis'
+precomputed_dir = 'datasets_numpis'
 dataset_dir = 'datasets'
 RAVDESS_SUBDIR = 'ravdess'
 CREMA_SUBDIR = 'crema/AudioWAV'
