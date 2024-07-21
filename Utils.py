@@ -10,6 +10,7 @@ from sklearn.model_selection import train_test_split
 import Models
 import TrainTesting
 import AudioDatasets
+import pickle
 
 RES_DIR = "results"
 PREFIX_CM = "cm"
@@ -71,19 +72,17 @@ def compute_confusion_matrix(model, test_dl, experiment_name, normalized=True):
     y_true, y_pred = _test_probas(model, test_dl)
     # y_pred = np.max(y_pred, 1) # thresholding, since the model returns probabilities
     cm = confusion_matrix(y_true, y_pred, normalize='true') if normalized else confusion_matrix(y_true, y_pred)
-    # if normalized:
-    #     cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
     cm = np.round(cm, 2)
 
     # sns heatmap
     plt.figure(figsize=(15, 20))
-    sns.set_theme(font_scale=1.4)
+    sns.set_theme(font_scale=1.5)
     sns.heatmap(cm, annot=True, fmt='g', cmap='viridis', xticklabels=list(TrainTesting.emotion_mapping.values()), yticklabels=list(TrainTesting.emotion_mapping.values()))
     plt.xlabel('Predicted', fontsize=18)
     plt.ylabel('Actual', fontsize=18)
     plt.savefig(os.path.join(conf_dir, f'{PREFIX_CM}_{experiment_name}_{i}.png'))
-    sns.set_theme(font_scale=1)
     plt.close('all')
+    sns.reset_defaults()
     
 def plots(model, experiment_name, train_loss, val_loss, train_acc, val_acc):
     """
@@ -167,5 +166,4 @@ def save_numpis(model, experiment_name, train_loss, val_loss, train_acc, val_acc
         'val_acc': val_acc
     
     }
-
-    np.save(os.path.join(numpi_dir, f'{PREFIX_NUMPIS}_{experiment_name}_{i}.npy'), numpi_dict)
+    pickle.dump(numpi_dict, open(os.path.join(numpi_dir, f'{PREFIX_NUMPIS}_{experiment_name}_{i}.npy'), 'wb'))
