@@ -2,10 +2,8 @@ import AudioDatasets
 import Models
 import torch
 import TrainTesting
-from AudioDatasets import noise, stretch, shift, pitch
 import Utils
 
-from torch.utils.data import DataLoader
 from torch.optim import Adam, AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR, CosineAnnealingWarmRestarts
 import numpy as np
@@ -13,14 +11,9 @@ import os
 import gc
 import pickle
 
-from matplotlib import pyplot as plt
 from sklearn.metrics import confusion_matrix
-import seaborn as sns
-import torchmetrics as tm
-from sklearn.preprocessing import OneHotEncoder, LabelEncoder
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from tqdm import tqdm
 
 import logging
 
@@ -30,13 +23,16 @@ pretrain_models_root = 'pretrained_models'
 scalers_root = 'scalers'
 pretraining = False
 force_recompute = False
+random_state = 0
+train_split = 0.7
+
 
 logging.basicConfig()
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.WARNING)
 logger.info(f"Starting... | pretraining: {pretraining} | pretrain_datasets: {pretrain_datasets} | force_recompute: {force_recompute}")
+
 if __name__ == '__main__':
-    
     for dataset_name in pretrain_datasets:
         if pretraining and dataset_name is None: continue
         
@@ -46,9 +42,10 @@ if __name__ == '__main__':
         training_dataset = dataset_name if pretraining else "ravdess"
         logger.debug(f"training_dataset: {str.upper(training_dataset)}")
         logger.info(f"Loading {training_dataset} dataset...")
-        X_train, X_val, X_test, y_train, y_val, y_test = AudioDatasets.get_data_splits(dataset_name=training_dataset, force_recompute=force_recompute, augment_train=True, random_state=0, train_split=0.7)
+        X_train, X_val, X_test, y_train, y_val, y_test = AudioDatasets.get_data_splits(dataset_name=training_dataset, force_recompute=force_recompute, augment_train=True, random_state=random_state, train_split=train_split)
         
-        scaler_path = os.path.join(scalers_root, f'{training_dataset}_scaler.pkl')
+        # beware, if you change the split, the scaler has to be recomputed, otherwise data will be leaked, i'll commit to a 70:10:20 seeded split everywhere for now
+        scaler_path = os.path.join(scalers_root, f'{training_dataset}_scaler_seed{random_state}_tsplit{int(train_split*100)}.pkl')
         if not os.path.exists(scaler_path):
             logger.info(f"Scaler not found, creating new scaler...")
             scaler = StandardScaler() # Standardize features
@@ -79,7 +76,7 @@ if __name__ == '__main__':
         logger.info(f"Creating model...")
         # model = Models.AudioCNN()
         logger.debug(f"X_train.shape: {X_train.shape}")
-        model = Models.AudioLSTM(input_size=X_train.shape[2], hidden_size=256, num_layers=4, log_level=logging.WARNING)
+        model = Models.AudioLSTM(input_size=X_train.shape[2], hidden_size=256, num_layers=5, log_level=logging.WARNING)
         model = model.to(TrainTesting.device)
         if not pretraining and dataset_name is not None:
             logger.info(f"Loading weights...")
@@ -87,7 +84,8 @@ if __name__ == '__main__':
         
         epochs = 80
         optimizer = AdamW(model.parameters(), lr=5e-5, fused=True, weight_decay=1e-6)
-        scheduler = CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-6)
+        # scheduler = CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-6)
+        scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=15, T_mult=1, eta_min=1e-6)
         criterion = torch.nn.CrossEntropyLoss()
 
         # Train model
