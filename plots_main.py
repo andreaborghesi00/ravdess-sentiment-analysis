@@ -8,30 +8,27 @@ logging.basicConfig()
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-# Path to the directory containing the NumPy arrays
 model = 'AudioLSTM'
 directory = f'results/numpis/{model}'
 
-# Get a list of all files in the directory
 files = os.listdir(directory)
-nexp = 2
+nexp = 3
+augmented = True
 
 plt.figure(figsize=(12, 6))
 
-# Iterate over each file
 for file in files:
+    is_augmented = False if file.split('_')[-2] == 'augmented' else True # i know it is counter intuitive but i'm checking the "not_augmented"
     # logger.debug(f'checking {file}')
-    # Check if the file is a NumPy array
-    if file.endswith('.npy') and file.split('.')[0].split('_')[-1] == str(nexp):
+    
+    if file.endswith('.npy') and (is_augmented == augmented) and file.split('.')[0].split('_')[-1] == str(nexp):
         logger.debug(f'loading {file}')
-        # Load the NumPy array
         dict = np.load(os.path.join(directory, file), allow_pickle=True)
         vals = dict['val_acc']
         dataset_type = file.split('_')[1]
-        # Generate the plot
         plt.plot(dict['val_acc'], label=dataset_type, alpha=0.8)
 
-outdir = f'results/plots/{model}/{Utils.PREFIX_PLOTS}_ALL_{nexp}.png'
+outdir = f'results/plots/{model}/{Utils.PREFIX_PLOTS}_ALL{"_noaug" if not augmented else ""}_{nexp}.png'
 
 plt.ylim(0, 1)
 plt.title(f'Validation accuracy', fontsize=16)
