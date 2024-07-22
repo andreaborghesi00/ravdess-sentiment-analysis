@@ -3,6 +3,7 @@ from torch.nn import Module, Sequential, Conv1d, BatchNorm1d, ReLU, MaxPool1d, L
 import torch.nn.functional as F
 import TrainTesting
 import logging
+from torchsummary import summary
 
 logging.basicConfig()
 class AudioCNN(Module):
@@ -255,4 +256,12 @@ def get_model(model_class, dict_path):
     except:
         raise Exception("Model weights not found. Please train the model first.")
     return model.to(TrainTesting.device)
+    
+    
+if __name__ == "__main__":
+    cnn = AudioCNN()
+    summary(cnn, (1, 162))
+    
+    lstm = AudioLSTM(162)
+    summary(lstm, (1, 162))
     

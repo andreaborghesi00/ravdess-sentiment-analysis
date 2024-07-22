@@ -17,12 +17,17 @@ from sklearn.preprocessing import StandardScaler
 
 import logging
 
-emotion_mapping = {1: 'neutral', 2: 'calm', 3: 'happy', 4: 'sad', 5: 'angry', 6: 'fear', 7: 'disgust', 8: 'surprise'}
 pretrain_datasets = [None, 'crema', 'savee', 'combined', 'tess']
 pretrain_models_root = 'pretrained_models'
 scalers_root = 'scalers'
+weights_path = ""
+
 pretraining = False
+augment_train = True
 force_recompute = False
+
+# For reproducibility, do not change these. 
+# If you do change them, make sure to recompute the scalers and the data splits, otherwise data will be leaked
 random_state = 0
 train_split = 0.7
 
@@ -38,11 +43,12 @@ if __name__ == '__main__':
         
         print(f'### {str.upper(dataset_name if dataset_name is not None else "RAW")} ###')
         experiment_name = f'{dataset_name}_pretrained' if dataset_name is not None else 'raw'
+        experiment_name = f'{experiment_name}_not_augmented' if not augment_train else experiment_name
         
         training_dataset = dataset_name if pretraining else "ravdess"
         logger.debug(f"training_dataset: {str.upper(training_dataset)}")
         logger.info(f"Loading {training_dataset} dataset...")
-        X_train, X_val, X_test, y_train, y_val, y_test = AudioDatasets.get_data_splits(dataset_name=training_dataset, force_recompute=force_recompute, augment_train=True, random_state=random_state, train_split=train_split)
+        X_train, X_val, X_test, y_train, y_val, y_test = AudioDatasets.get_data_splits(dataset_name=training_dataset, force_recompute=force_recompute, augment_train=augment_train, random_state=random_state, train_split=train_split)
         
         # beware, if you change the split, the scaler has to be recomputed, otherwise data will be leaked, i'll commit to a 70:10:20 seeded split everywhere for now
         scaler_path = os.path.join(scalers_root, f'{training_dataset}_scaler_seed{random_state}_tsplit{int(train_split*100)}.pkl')
@@ -74,18 +80,22 @@ if __name__ == '__main__':
         
         # Create model
         logger.info(f"Creating model...")
-        # model = Models.AudioCNN()
+        model = Models.AudioCNN()
         logger.debug(f"X_train.shape: {X_train.shape}")
-        model = Models.AudioLSTM(input_size=X_train.shape[2], hidden_size=256, num_layers=5, log_level=logging.WARNING)
+        # model = Models.AudioLSTM(input_size=X_train.shape[2], hidden_size=256, num_layers=5, log_level=logging.WARNING)
         model = model.to(TrainTesting.device)
+        
+        if dataset_name is not None:
+            weights_path = os.path.join(pretrain_models_root, f'{model.__class__.__name__}_{dataset_name}.pth' if augment_train else f'{model.__class__.__name__}_{dataset_name}_not_augmented.pth')
+        
         if not pretraining and dataset_name is not None:
             logger.info(f"Loading weights...")
-            model.load_state_dict(torch.load(os.path.join(pretrain_models_root, f'{model.__class__.__name__}_{dataset_name}.pth')))
+            model.load_state_dict(torch.load(weights_path))
         
         epochs = 80
         optimizer = AdamW(model.parameters(), lr=5e-5, fused=True, weight_decay=1e-6)
         # scheduler = CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-6)
-        scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=15, T_mult=1, eta_min=1e-6)
+        scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=2, eta_min=1e-6)
         criterion = torch.nn.CrossEntropyLoss()
 
         # Train model
@@ -95,7 +105,7 @@ if __name__ == '__main__':
         
         ### PRETRAINING ONLY ###
         if pretraining:
-            torch.save(model.state_dict(), os.path.join(pretrain_models_root, f'{model.__class__.__name__}_{dataset_name}.pth'))      
+            torch.save(model.state_dict(), weights_path)      
         else:
         ### POST-PRETRAINING ONLY ###
             Utils.save_model(model, experiment_name)
