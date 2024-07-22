@@ -273,20 +273,20 @@ def extract_features(data, sample_rate):
     - result (ndarray): Extracted audio features.
     """
     result = np.array([])
-    zcr = np.mean(librosa.feature.zero_crossing_rate(y=data).T, axis=0)
+    zcr = np.mean(librosa.feature.zero_crossing_rate(y=data).T, axis=0) # zero crossing rate
     result=np.hstack((result, zcr))
 
-    stft = np.abs(librosa.stft(data))
-    chroma_stft = np.mean(librosa.feature.chroma_stft(S=stft, sr=sample_rate).T, axis=0)
+    stft = np.abs(librosa.stft(data)) # (short time) fourier transform
+    chroma_stft = np.mean(librosa.feature.chroma_stft(S=stft, sr=sample_rate).T, axis=0) # chroma classes (12)
     result = np.hstack((result, chroma_stft))
 
-    mfcc = np.mean(librosa.feature.mfcc(y=data, sr=sample_rate).T, axis=0)
+    mfcc = np.mean(librosa.feature.mfcc(y=data, sr=sample_rate).T, axis=0) # mel-frequency cepstral coefficients
     result = np.hstack((result, mfcc))
 
-    rms = np.mean(librosa.feature.rms(y=data).T, axis=0)
+    rms = np.mean(librosa.feature.rms(y=data).T, axis=0) # root mean square, indication of loudness
     result = np.hstack((result, rms))
 
-    mel = np.mean(librosa.feature.melspectrogram(y=data, sr=sample_rate).T, axis=0)
+    mel = np.mean(librosa.feature.melspectrogram(y=data, sr=sample_rate).T, axis=0) # mel spectrogram, mean power spectral density
     result = np.hstack((result, mel))
 
     return result
@@ -339,6 +339,17 @@ def get_features(path, augment=False):
     return result
 
 def _extract(path, labels, augment=False):
+    """
+    Extracts features from audio files and returns the features and corresponding labels.
+
+    Args:
+        path (list): List of file paths to the audio files.
+        labels (list): List of labels corresponding to each audio file.
+        augment (bool, optional): Flag indicating whether to augment the features. Defaults to False.
+
+    Returns:
+        tuple: A tuple containing the extracted features (X_features) and the corresponding labels (Y).
+    """
     X_features = []
     Y = []
     pbar = tqdm(total=len(path))
@@ -367,13 +378,13 @@ def get_data_splits(dataset_name='ravdess', force_recompute=False, random_state=
     precomputed_req_dir = os.path.join(precomputed_dir, dataset_name)
     os.makedirs(precomputed_req_dir, exist_ok=True)
     
-    X_train_path = os.path.join(precomputed_req_dir, 'X_train.npy')
+    X_train_path = os.path.join(precomputed_req_dir, 'X_train.npy' if augment_train else 'X_train_noaug.npy')
     X_val_path = os.path.join(precomputed_req_dir, 'X_val.npy')
     X_test_path = os.path.join(precomputed_req_dir, 'X_test.npy')
-    Y_train_path = os.path.join(precomputed_req_dir, 'Y_train.npy')
+    Y_train_path = os.path.join(precomputed_req_dir, 'Y_train.npy' if augment_train else 'Y_train_noaug.npy')
     Y_val_path = os.path.join(precomputed_req_dir, 'Y_val.npy')
     Y_test_path = os.path.join(precomputed_req_dir, 'Y_test.npy')
-    paths_exist = np.any([os.path.exists(X_train_path), os.path.exists(X_val_path), os.path.exists(X_test_path), os.path.exists(Y_train_path), os.path.exists(Y_val_path), os.path.exists(Y_test_path)])
+    paths_exist = np.all([os.path.exists(X_train_path), os.path.exists(X_val_path), os.path.exists(X_test_path), os.path.exists(Y_train_path), os.path.exists(Y_val_path), os.path.exists(Y_test_path)])
     
     if force_recompute or paths_exist == False:
         datasets_extractors = {
