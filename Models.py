@@ -250,7 +250,11 @@ def get_model(model_class, dict_path):
     Raises:
         Exception: If the model weights are not found.
     """
-    model = model_class()
+    
+    if model_class == AudioCNN:
+        model = model_class()
+    elif model_class == AudioLSTM:
+        model = model_class(162, hidden_size=256, num_layers=5)
     try:
         model = torch.load(dict_path)['model']
     except:

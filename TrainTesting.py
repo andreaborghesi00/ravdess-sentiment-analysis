@@ -190,7 +190,7 @@ def infer(model, data, sr, extract_features=True):
         features = data
 
     features = np.expand_dims(features, axis=0)    
-    scaler = pickle.load(open('ravdess_scaler.pkl', 'rb'))
+    scaler = pickle.load(open('scalers/ravdess_scaler_seed0_tsplit70.pkl', 'rb'))
     features = scaler.transform(features)
 
     model.eval()
